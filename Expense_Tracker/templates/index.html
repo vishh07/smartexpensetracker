@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Expense Tracker</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-center mb-8">Smart Expense Tracker</h1>
+        
+        <!-- File Upload Section -->
+        <div class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Upload Bank Statement</h2>
+            <form id="uploadForm" class="space-y-4">
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                    <input type="file" id="fileInput" accept=".csv" class="hidden">
+                    <label for="fileInput" class="cursor-pointer block text-center">
+                        <span class="text-blue-500">Choose CSV file</span> or drag and drop
+                    </label>
+                </div>
+                <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">
+                    Process Expenses
+                </button>
+            </form>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Total Expenses -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold mb-4">Total Expenses</h3>
+                <p class="text-3xl font-bold text-blue-500" id="totalExpenses">$0.00</p>
+            </div>
+
+            <!-- Category Breakdown -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold mb-4">Category Breakdown</h3>
+                <canvas id="categoryChart"></canvas>
+            </div>
+
+            <!-- Monthly Spending -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold mb-4">Monthly Spending</h3>
+                <canvas id="monthlyChart"></canvas>
+            </div>
+
+            <!-- Top Expenses -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold mb-4">Top Expenses</h3>
+                <div id="topExpenses" class="space-y-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('fileInput');
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    displayResults(data.insights);
+                } else {
+                    alert(data.error || 'Error processing file');
+                }
+            } catch (error) {
+                alert('Error uploading file');
+            }
+        });
+
+        function displayResults(insights) {
+            document.getElementById('results').classList.remove('hidden');
+            
+            // Display total expenses
+            document.getElementById('totalExpenses').textContent = 
+                `$${insights.total_expenses.toFixed(2)}`;
+
+            // Create category breakdown chart
+            new Chart(document.getElementById('categoryChart'), {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(insights.category_breakdown),
+                    datasets: [{
+                        data: Object.values(insights.category_breakdown),
+                        backgroundColor: [
+                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'
+                        ]
+                    }]
+                }
+            });
+
+            // Create monthly spending chart
+            new Chart(document.getElementById('monthlyChart'), {
+                type: 'line',
+                data: {
+                    labels: Object.keys(insights.monthly_spending),
+                    datasets: [{
+                        label: 'Monthly Spending',
+                        data: Object.values(insights.monthly_spending),
+                        borderColor: '#36A2EB'
+                    }]
+                }
+            });
+
+            // Display top expenses
+            const topExpensesDiv = document.getElementById('topExpenses');
+            topExpensesDiv.innerHTML = insights.top_expenses
+                .map(expense => `
+                    <div class="border-b pb-2">
+                        <div class="font-semibold">${expense.description}</div>
+                        <div class="text-sm text-gray-600">
+                            ${expense.date} - ${expense.category}
+                            <span class="float-right font-semibold">$${expense.amount.toFixed(2)}</span>
+                        </div>
+                    </div>
+                `).join('');
+        }
+    </script>
+</body>
+</html>
